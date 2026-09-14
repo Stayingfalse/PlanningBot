@@ -62,6 +62,7 @@ Every participant is a Discord user, whether they respond via the website or via
 - `GET /e/:id` — view an event and enter your availability (viewing is public; entering availability requires login).
 - `GET /` and `GET /e/:id` show an **Add Bot to Server** button when `DISCORD_CLIENT_ID` is configured.
 - On `GET /e/:id`, **My availability** includes a **Copy day pattern** action so you can copy one day's selected slots to other day tabs before saving.
+- Day tabs on `GET /e/:id` now show a swipe hint automatically when tabs overflow horizontally.
 - Full REST API (`/api/events`, `/api/events/:id`, `/api/events/:id/me`, `/api/events/:id/results`) — see the comment block at the top of `server.js` for the exact contract. The web page is just one consumer of this API.
 
 ### Discord bot
