@@ -6,6 +6,7 @@ const PAGE_STYLE = `
     --text: #e8eaed; --muted: #9aa3b2; --accent: #5b8def; --accent-2: #4ade80;
     --danger: #f87171; --discord: #5865F2;
   }
+
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
@@ -70,10 +71,20 @@ const PAGE_STYLE = `
   .responders { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
   .responder-chip { font-size: 0.8rem; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--panel-2); }
   .responder-chip.done { border-color: var(--accent-2); color: var(--accent-2); }
+  .top-actions { margin-top: 10px; }
+  .top-actions .btn { margin-top: 0; width: 100%; }
+  .copyday-targets { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+  .copyday-target { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: var(--muted); }
+  .copyday-target input { margin: 0; }
   #toast { position: fixed; bottom: 76px; left: 50%; transform: translateX(-50%); background: #000; color: #fff;
     padding: 8px 14px; border-radius: 8px; font-size: 0.85rem; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
   #toast.show { opacity: 0.92; }
 `;
+
+const DISCORD_CLIENT_ID = (process.env.DISCORD_CLIENT_ID || '').trim();
+const BOT_INVITE_URL = DISCORD_CLIENT_ID
+  ? `https://discord.com/api/oauth2/authorize?client_id=${encodeURIComponent(DISCORD_CLIENT_ID)}&permissions=149504&scope=bot%20applications.commands`
+  : '';
 
 function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -90,6 +101,11 @@ function userBar(viewer) {
     <span class="spacer"></span>
     <a href="/auth/logout">Log out</a>
   </div>`;
+}
+
+function botInviteButton() {
+  if (!BOT_INVITE_URL) return '';
+  return `<div class="top-actions"><a class="btn discord" href="${escapeHtml(BOT_INVITE_URL)}" target="_blank" rel="noopener noreferrer">Add Bot to Server</a></div>`;
 }
 
 function homePage(viewer) {
@@ -147,6 +163,7 @@ function homePage(viewer) {
   ${userBar(viewer)}
   <h1>📅 meetup-lite</h1>
   <p class="muted">Pick some dates and a time window, share the link, see when everyone's actually free.</p>
+  ${botInviteButton()}
   ${formOrLogin}
 
 <script>
@@ -253,6 +270,7 @@ function eventPage(eventId) {
   <div id="userBarSlot"></div>
   <h1 id="eventTitle">Loading…</h1>
   <p class="muted" id="eventMeta"></p>
+  ${botInviteButton()}
   <div class="responders" id="respondersBar"></div>
 
   <div class="copyrow">
@@ -279,6 +297,11 @@ function eventPage(eventId) {
       <p class="muted">Responding as <strong id="whoAmIName"></strong>. Tap a time to mark yourself free — tap and drag to select a range.</p>
     </div>
     <div class="tabs" id="dayTabs"></div>
+    <div class="card" id="copyDayCard" style="display:none;">
+      <p class="muted" style="margin:0;">Copy this day's availability to other days:</p>
+      <div class="copyday-targets" id="copyDayTargets"></div>
+      <button class="secondary small" id="copyDayBtn" type="button" disabled>Copy day pattern</button>
+    </div>
     <div class="slotlist" id="slotList"></div>
   </div>
 
@@ -370,7 +393,7 @@ function eventPage(eventId) {
     rebuildLocalCache();
     if (!dayList.includes(activeDay)) activeDay = dayList[0];
     if (!dayList.includes(activeDayResults)) activeDayResults = dayList[0];
-    renderDayTabs(); renderSlotList(); refreshResults();
+    renderDayTabs(); renderSlotList(); renderCopyDayOptions(); refreshResults();
   };
 
   async function loadViewer() {
@@ -384,11 +407,13 @@ function eventPage(eventId) {
       el('whoAmI').style.display = '';
       el('whoAmIName').textContent = viewer.username;
       el('saveBar').style.display = '';
+      renderCopyDayOptions();
     } else {
       el('loginBtn').href = '/auth/discord?next=' + encodeURIComponent('/e/' + eventId);
       el('loginPrompt').style.display = '';
       el('whoAmI').style.display = 'none';
       el('saveBar').style.display = 'none';
+      el('copyDayCard').style.display = 'none';
     }
   }
 
@@ -409,6 +434,7 @@ function eventPage(eventId) {
       if (mine) mySlots = new Set(mine.slots);
     }
     renderSlotList();
+    renderCopyDayOptions();
     refreshResults();
   }
 
@@ -425,7 +451,7 @@ function eventPage(eventId) {
 
   function renderDayTabs() {
     for (const [tabsId, active, onClick] of [
-      ['dayTabs', () => activeDay, (d) => { activeDay = d; renderSlotList(); renderDayTabs(); }],
+      ['dayTabs', () => activeDay, (d) => { activeDay = d; renderSlotList(); renderDayTabs(); renderCopyDayOptions(); }],
       ['dayTabsResults', () => activeDayResults, (d) => { activeDayResults = d; renderResultsSlotList(); renderDayTabs(); }],
     ]) {
       const wrap = el(tabsId);
@@ -442,6 +468,49 @@ function eventPage(eventId) {
   }
 
   function slotsForDay(day) { return event.slots.filter((s) => slotLocalCache.get(s) === day); }
+
+  function renderCopyDayOptions() {
+    const card = el('copyDayCard');
+    const targets = el('copyDayTargets');
+    const copyBtn = el('copyDayBtn');
+    if (!viewer || !event || !activeDay || dayList.length <= 1) {
+      card.style.display = 'none';
+      return;
+    }
+    card.style.display = '';
+    targets.innerHTML = '';
+    const otherDays = dayList.filter((d) => d !== activeDay);
+    otherDays.forEach((d) => {
+      const row = document.createElement('label');
+      row.className = 'copyday-target';
+      const check = document.createElement('input');
+      check.type = 'checkbox';
+      check.value = d;
+      check.addEventListener('change', () => {
+        copyBtn.disabled = !targets.querySelector('input:checked');
+      });
+      const text = document.createElement('span');
+      text.textContent = fmtDay(d);
+      row.append(check, text);
+      targets.append(row);
+    });
+    copyBtn.disabled = true;
+  }
+
+  function copyPatternToDays(targetDays) {
+    const sourceSlots = slotsForDay(activeDay);
+    const selectedIndexes = [];
+    sourceSlots.forEach((slot, idx) => {
+      if (mySlots.has(slot)) selectedIndexes.push(idx);
+    });
+    targetDays.forEach((day) => {
+      const daySlots = slotsForDay(day);
+      daySlots.forEach((slot) => mySlots.delete(slot));
+      selectedIndexes.forEach((idx) => {
+        if (idx < daySlots.length) mySlots.add(daySlots[idx]);
+      });
+    });
+  }
 
   function renderSlotList() {
     const list = el('slotList');
@@ -542,6 +611,15 @@ function eventPage(eventId) {
 
   el('tabAvailability').onclick = () => { el('availabilityView').style.display = ''; el('resultsView').style.display = 'none'; };
   el('tabResults').onclick = () => { el('availabilityView').style.display = 'none'; el('resultsView').style.display = ''; refreshResults(); };
+
+  el('copyDayBtn').onclick = () => {
+    const targetDays = Array.from(el('copyDayTargets').querySelectorAll('input:checked')).map((n) => n.value);
+    if (targetDays.length === 0) return;
+    copyPatternToDays(targetDays);
+    renderSlotList();
+    renderCopyDayOptions();
+    toast('Copied to ' + targetDays.length + ' day' + (targetDays.length === 1 ? '' : 's'));
+  };
 
   el('saveBtn').onclick = async () => {
     const res = await fetch('/api/events/' + eventId + '/me', {
