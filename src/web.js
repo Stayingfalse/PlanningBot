@@ -10,7 +10,7 @@ const PAGE_STYLE = `
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-  body { padding: 16px; padding-bottom: 96px; max-width: 640px; margin: 0 auto; }
+  body { padding: 16px; padding-block-end: 96px; max-width: 640px; margin: 0 auto; }
   h1 { font-size: 1.3rem; margin: 0 0 4px; }
   h2 { font-size: 1.05rem; margin: 20px 0 8px; }
   p.muted, .muted { color: var(--muted); font-size: 0.9rem; }
@@ -19,7 +19,7 @@ const PAGE_STYLE = `
     width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--border);
     background: var(--panel-2); color: var(--text); font-size: 1rem;
   }
-  .row { display: flex; gap: 8px; }
+  .row { display: flex; gap: 12px; }
   .row > * { flex: 1; }
   button, a.btn {
     font-size: 1rem; padding: 12px 16px; border-radius: 10px; border: none;
@@ -31,14 +31,15 @@ const PAGE_STYLE = `
   button.small { padding: 8px 12px; font-size: 0.85rem; }
   button.link { background: none; color: var(--accent); padding: 4px; }
   button:disabled { opacity: 0.5; cursor: default; }
-  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin-top: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin-top: 16px; }
   .datelist { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
   .datelist .item { display: flex; align-items: center; justify-content: space-between;
     background: var(--panel-2); border-radius: 8px; padding: 8px 12px; font-size: 0.9rem; }
-  .tabs { display: flex; gap: 6px; overflow-x: auto; padding: 4px 0 10px; }
+  .tabs { display: flex; gap: 10px; overflow-x: auto; padding: 4px 24px 10px 0; }
   .tabs button { flex: none; background: var(--panel-2); color: var(--muted); border: 1px solid var(--border); white-space: nowrap; }
   .tabs button.active { background: var(--accent); color: white; border-color: var(--accent); }
-  .slotlist { display: flex; flex-direction: column; gap: 6px; user-select: none; }
+  .tabhint { margin: -2px 0 10px; font-size: 0.8rem; }
+  .slotlist { display: flex; flex-direction: column; gap: 8px; user-select: none; }
   .slot { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px;
     border-radius: 10px; background: var(--panel-2); border: 1px solid var(--border); font-size: 0.95rem; }
   .slot.selected { background: var(--accent); border-color: var(--accent); color: white; }
@@ -50,25 +51,26 @@ const PAGE_STYLE = `
   .heat3 { background: #3a7fd6; }
   .heatfull { background: var(--accent-2); color: #0f1115; }
   .heatfull .count { color: #0f1115; }
-  .toolbar { position: fixed; left: 0; right: 0; bottom: 0; background: var(--panel);
-    border-top: 1px solid var(--border); padding: 10px 16px; display: flex; gap: 8px; }
-  .toolbar { max-width: 640px; margin: 0 auto; }
+  .toolbar { position: fixed; inset-inline: 0; inset-block-end: 0; background: var(--panel);
+    border-top: 1px solid var(--border); padding: 10px max(16px, env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); display: flex; gap: 8px; max-width: 640px; margin: 0 auto; }
   .pill { display: inline-block; background: var(--panel-2); border: 1px solid var(--border);
     border-radius: 999px; padding: 2px 10px; font-size: 0.75rem; color: var(--muted); }
-  .toggle-row { display: flex; gap: 8px; margin-top: 10px; }
+  .toggle-row { display: flex; gap: 12px; margin-top: 12px; }
   .toggle-row button { flex: 1; }
   .best-banner { background: rgba(74,222,128,0.12); border: 1px solid var(--accent-2); border-radius: 12px;
     padding: 12px; margin-top: 10px; }
   .missing { font-size: 0.8rem; color: var(--danger); }
   a { color: var(--accent); }
-  .copyrow { display: flex; gap: 6px; margin-top: 8px; }
+  .copyrow { display: flex; gap: 12px; margin-top: 12px; }
   .copyrow input { flex: 1; }
+  .timezone-row { align-items: center; margin-top: 12px; }
+  .timezone-row .label { flex: none; }
   .userbar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
   .userbar img { width: 28px; height: 28px; border-radius: 50%; }
   .userbar .name { font-size: 0.9rem; }
   .userbar .spacer { flex: 1; }
   .userbar a { font-size: 0.8rem; color: var(--muted); }
-  .responders { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .responders { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
   .responder-chip { font-size: 0.8rem; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--panel-2); }
   .responder-chip.done { border-color: var(--accent-2); color: var(--accent-2); }
   .top-actions { margin-top: 10px; }
@@ -76,7 +78,7 @@ const PAGE_STYLE = `
   .copyday-targets { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
   .copyday-target { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: var(--muted); }
   .copyday-target input { margin: 0; }
-  #toast { position: fixed; bottom: 76px; left: 50%; transform: translateX(-50%); background: #000; color: #fff;
+  #toast { position: fixed; inset-block-end: 76px; inset-inline-start: 50%; transform: translateX(-50%); background: #000; color: #fff;
     padding: 8px 14px; border-radius: 8px; font-size: 0.85rem; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
   #toast.show { opacity: 0.92; }
 `;
@@ -278,8 +280,8 @@ function eventPage(eventId) {
     <button class="secondary small" id="copyBtn" type="button">Copy link</button>
   </div>
 
-  <div class="row" style="align-items:center; margin-top:10px;">
-    <span class="muted" style="flex:none;">Times shown in</span>
+  <div class="row timezone-row">
+    <span class="muted label">Times shown in</span>
     <select id="viewerTz"></select>
   </div>
 
@@ -297,6 +299,7 @@ function eventPage(eventId) {
       <p class="muted">Responding as <strong id="whoAmIName"></strong>. Tap a time to mark yourself free — tap and drag to select a range.</p>
     </div>
     <div class="tabs" id="dayTabs"></div>
+    <p class="muted tabhint" id="dayTabsHint" style="display:none;">Swipe to see more days →</p>
     <div class="card" id="copyDayCard" style="display:none;">
       <p class="muted" style="margin:0;">Copy this day's availability to other days:</p>
       <div class="copyday-targets" id="copyDayTargets"></div>
@@ -311,6 +314,7 @@ function eventPage(eventId) {
     <div id="topList" class="card"></div>
     <h2>Full picture</h2>
     <div class="tabs" id="dayTabsResults"></div>
+    <p class="muted tabhint" id="dayTabsResultsHint" style="display:none;">Swipe to see more days →</p>
     <div class="slotlist" id="slotListResults"></div>
   </div>
 
@@ -465,6 +469,20 @@ function eventPage(eventId) {
         wrap.append(b);
       });
     }
+    updateTabHints();
+  }
+
+  function updateTabHints() {
+    const mappings = [
+      ['dayTabs', 'dayTabsHint'],
+      ['dayTabsResults', 'dayTabsResultsHint'],
+    ];
+    mappings.forEach(([tabsId, hintId]) => {
+      const tabs = el(tabsId);
+      const hint = el(hintId);
+      if (!tabs || !hint) return;
+      hint.style.display = tabs.scrollWidth > tabs.clientWidth ? '' : 'none';
+    });
   }
 
   function slotsForDay(day) { return event.slots.filter((s) => slotLocalCache.get(s) === day); }
@@ -620,6 +638,8 @@ function eventPage(eventId) {
     renderCopyDayOptions();
     toast('Copied to ' + targetDays.length + ' day' + (targetDays.length === 1 ? '' : 's'));
   };
+
+  window.addEventListener('resize', updateTabHints);
 
   el('saveBtn').onclick = async () => {
     const res = await fetch('/api/events/' + eventId + '/me', {
