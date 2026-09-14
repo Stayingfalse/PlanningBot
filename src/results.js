@@ -31,10 +31,18 @@ function computeResults(eventId) {
     .sort((a, b) => b.count - a.count || a.slot.localeCompare(b.slot))
     .slice(0, 8);
 
+  // A "match" only means something once at least two people have entered their
+  // availability — one person's free slots aren't a match with anyone.
+  let matched = null;
+  if (total >= 2 && maxCount >= 2) {
+    const matchedSlots = slots.filter((s) => counts[s] === maxCount);
+    matched = { count: maxCount, total, slots: matchedSlots, everyone: maxCount === total };
+  }
+
   const respondedIds = new Set(participants.map((p) => p.discordId));
   const expectedResponders = db.getExpectedResponders(eventId).map((r) => ({ ...r, responded: respondedIds.has(r.discordId) }));
 
-  return { totalParticipants: total, slots, counts, names, best, top, expectedResponders };
+  return { totalParticipants: total, slots, counts, names, best, top, matched, expectedResponders };
 }
 
 module.exports = { computeResults };

@@ -38,10 +38,11 @@ const oauth = require('./src/oauth');
 const rest = require('./src/discordRest');
 const interactions = require('./src/interactions');
 const { computeResults } = require('./src/results');
-const { isValidTimeZone, generateSlots } = require('./src/time');
+const { isValidTimeZone, generateSlots, localDateKey, formatDayLabel, formatTimeInZone } = require('./src/time');
 const { homePage, eventPage } = require('./src/web');
 
 const PORT = process.env.PORT || 3000;
+const BASE_URL = (process.env.BASE_URL || '').replace(/\/+$/, '');
 
 // ── Small helpers ───────────────────────────────────────────────────────
 
@@ -92,6 +93,35 @@ function validEventInput(body) {
   return null;
 }
 
+// Builds the Open Graph data for an event page — this is what link unfurlers
+// (Discord, iMessage, Slack…) turn into the rich embed when the link is shared.
+function eventOgData(event) {
+  const sorted = [...event.dates].sort();
+  const dateRange = sorted.length === 1
+    ? formatDayLabel(sorted[0])
+    : `${formatDayLabel(sorted[0])} – ${formatDayLabel(sorted[sorted.length - 1])}`;
+  const lines = [
+    `📆 ${dateRange} · ${event.startHour}:00–${event.endHour}:00 (${event.timezone.replace(/_/g, ' ')})`,
+    `Organized by ${event.createdByName}`,
+  ];
+  const results = computeResults(event.id);
+  if (results.totalParticipants > 0) {
+    lines.push(`👥 ${results.totalParticipants} player${results.totalParticipants === 1 ? '' : 's'} signed up`);
+  }
+  if (results.matched) {
+    const slot = results.matched.slots[0];
+    const when = `${formatDayLabel(localDateKey(slot, event.timezone))} at ${formatTimeInZone(slot, event.timezone)}`;
+    lines.push(results.matched.everyone
+      ? `✅ Matched date: ${when} — everyone is free!`
+      : `🔶 Best match so far: ${when} — ${results.matched.count}/${results.matched.total} free`);
+  }
+  return {
+    title: `📅 ${event.title} — meetup-lite`,
+    description: lines.join('\n'),
+    url: BASE_URL ? `${BASE_URL}/e/${event.id}` : undefined,
+  };
+}
+
 // ── Router ──────────────────────────────────────────────────────────────
 
 const server = http.createServer(async (req, res) => {
@@ -101,14 +131,14 @@ const server = http.createServer(async (req, res) => {
 
     // GET /
     if (req.method === 'GET' && parts.length === 0) {
-      return sendHtml(res, 200, homePage(oauth.getViewer(req)));
+      return sendHtml(res, 200, homePage(oauth.getViewer(req), { title: 'meetup-lite', description: 'Pick some dates and a time window, share the link, see when everyone’s actually free.', url: BASE_URL || undefined }));
     }
 
     // GET /e/:id  — page shell only; data comes from /api/*
     if (req.method === 'GET' && parts[0] === 'e' && parts.length === 2) {
       const event = db.getEvent(parts[1]);
       if (!event) return sendHtml(res, 404, '<h1>Event not found</h1>');
-      return sendHtml(res, 200, eventPage(parts[1]));
+      return sendHtml(res, 200, eventPage(parts[1], eventOgData(event)));
     }
 
     // ── Auth ──
