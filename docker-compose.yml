@@ -1,0 +1,13 @@
+services:
+  meetup-lite:
+    build: .
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    volumes:
+      - meetup-data:/data
+    restart: unless-stopped
+
+volumes:
+  meetup-data:
