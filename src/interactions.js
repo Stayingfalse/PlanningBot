@@ -97,6 +97,8 @@ function buildTrackerComponents(event) {
   lines.push('');
   if (results.totalParticipants === 0) {
     lines.push('_No one has entered their availability yet._');
+  } else if (results.totalParticipants < 2) {
+    lines.push('_Waiting on at least one more person — a matched date needs at least two people\'s availability._');
   } else if (results.best.slots.length > 0) {
     const s = results.best.slots[0];
     const extra = results.best.slots.length > 1 ? ` (+${results.best.slots.length - 1} more)` : '';

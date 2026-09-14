@@ -33,7 +33,7 @@ You need one Discord Application for both login and the bot.
    - **Bot** tab → **Reset Token**, copy it into `.env` as `DISCORD_BOT_TOKEN`.
    - **General Information** tab → copy **Public Key** into `.env` as `DISCORD_PUBLIC_KEY`.
    - **General Information** tab → set **Interactions Endpoint URL** to `https://your-domain.com/discord/interactions`. Discord will send a test ping here — it must resolve *after* your container is already running with `DISCORD_PUBLIC_KEY` set, or verification fails.
-   - **OAuth2 → URL Generator**: scopes `bot` and `applications.commands`; bot permissions `Send Messages`, `Embed Links`, `Use Slash Commands`, `Mention Everyone` (needed so the responder-tag pings actually notify people). Open the generated URL to add the bot to your server.
+   - **Installation** tab (or **OAuth2 → URL Generator** with the *Guild Install* integration type): scopes `bot` and `applications.commands`; bot permissions `Send Messages`, `Embed Links`, `Use Slash Commands`, `Mention Everyone` (needed so the responder-tag pings actually notify people). Open the generated URL to add the bot to your server. The in-app **Add Bot to Server** button uses this same Guild Install URL (`integration_type=1`), so it works even though the app has no OAuth2 code-grant redirect configured — if you build your own invite URL instead and leave off `integration_type=1`, Discord will reject it with "Integration requires code grant".
 5. Restart the container after changing `.env` — slash commands are (re-)registered automatically on every boot when `DISCORD_BOT_TOKEN` is set.
 
 If you only ever intend to use the web app (no bot), you can skip step 4 entirely — `DISCORD_BOT_TOKEN` / `DISCORD_PUBLIC_KEY` are optional and everything else still works.
@@ -59,7 +59,8 @@ Every participant is a Discord user, whether they respond via the website or via
 ### Web
 
 - `GET /` — create an event (requires login).
-- `GET /e/:id` — view an event and enter your availability (viewing is public; entering availability requires login).
+- `GET /e/:id` — view an event and enter your availability (viewing is public; entering availability requires login). The page carries Open Graph / Twitter Card meta tags, so sharing the link in Discord, iMessage, Slack, etc. unfurls a rich embed with the event title, date range, how many people have signed up (once anyone has), and the current matched date (once one exists).
+- A **matched date** is only reported once at least two people have entered their availability — one person's free slots aren't a match with anyone. Until then the results view and the Discord tracker say they're waiting on more people.
 - `GET /` and `GET /e/:id` show an **Add Bot to Server** button when `DISCORD_CLIENT_ID` is configured.
 - On `GET /e/:id`, **My availability** includes a **Copy day pattern** action so you can copy one day's selected slots to other day tabs before saving.
 - Day tabs on `GET /e/:id` now show a swipe hint automatically when tabs overflow horizontally.

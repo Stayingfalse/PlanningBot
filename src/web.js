@@ -84,8 +84,12 @@ const PAGE_STYLE = `
 `;
 
 const DISCORD_CLIENT_ID = (process.env.DISCORD_CLIENT_ID || '').trim();
+// integration_type=1 (Guild Install) is what makes this a pure "add bot" link.
+// Without it, Discord treats the authorize URL as an OAuth2 code grant and the
+// install fails with "Integration requires code grant" unless the app has a
+// redirect URL configured (this app's OAuth redirect is a separate login flow).
 const BOT_INVITE_URL = DISCORD_CLIENT_ID
-  ? `https://discord.com/api/oauth2/authorize?client_id=${encodeURIComponent(DISCORD_CLIENT_ID)}&permissions=149504&scope=bot%20applications.commands`
+  ? `https://discord.com/api/oauth2/authorize?client_id=${encodeURIComponent(DISCORD_CLIENT_ID)}&permissions=149504&integration_type=1&scope=bot%20applications.commands`
   : '';
 
 function escapeHtml(str) {
@@ -110,7 +114,24 @@ function botInviteButton() {
   return `<div class="top-actions"><a class="btn discord" href="${escapeHtml(BOT_INVITE_URL)}" target="_blank" rel="noopener noreferrer">Add Bot to Server</a></div>`;
 }
 
-function homePage(viewer) {
+// Open Graph / Twitter Card tags, so links shared in Discord, iMessage, etc.
+// unfurl into a rich embed with details about the event. Values arrive
+// pre-computed as plain strings; everything is HTML-escaped here.
+function ogMetaTags({ title, description, url }) {
+  const t = escapeHtml(title);
+  const d = escapeHtml(description);
+  const u = url ? escapeHtml(url) : null;
+  return `
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="meetup-lite">
+<meta property="og:title" content="${t}">
+<meta property="og:description" content="${d}">
+${u ? `<meta property="og:url" content="${u}">\n` : ''}<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="${t}">
+<meta name="twitter:description" content="${d}">`;
+}
+
+function homePage(viewer, og) {
   const formOrLogin = viewer ? `
     <div class="card">
       <label for="title">Event name</label>
@@ -159,6 +180,7 @@ function homePage(viewer) {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>meetup-lite</title>
+${ogMetaTags(og || { title: 'meetup-lite', description: 'Pick some dates and a time window, share the link, see when everyone\u2019s actually free.' })}
 <style>${PAGE_STYLE}</style>
 </head>
 <body>
@@ -259,13 +281,14 @@ function homePage(viewer) {
 </html>`;
 }
 
-function eventPage(eventId) {
+function eventPage(eventId, og) {
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>meetup-lite</title>
+<title>${og ? escapeHtml(og.title) : 'meetup-lite'}</title>
+${ogMetaTags(og || { title: 'meetup-lite event', description: 'See when everyone is free and enter your own availability.' })}
 <style>${PAGE_STYLE}</style>
 </head>
 <body>
@@ -563,6 +586,7 @@ function eventPage(eventId) {
   function renderBestBanner(results) {
     const banner = el('bestBanner');
     if (results.totalParticipants === 0) { banner.innerHTML = '<p class="muted">No one has submitted availability yet.</p>'; return; }
+    if (results.totalParticipants < 2) { banner.innerHTML = '<p class="muted">Waiting on at least one more person — a matched date needs at least two people\u2019s availability.</p>'; return; }
     if (results.best.slots.length > 0) {
       banner.innerHTML = '';
       const div = document.createElement('div');
@@ -660,4 +684,4 @@ function eventPage(eventId) {
 </html>`;
 }
 
-module.exports = { homePage, eventPage, escapeHtml };
+module.exports = { homePage, eventPage, escapeHtml, ogMetaTags };
