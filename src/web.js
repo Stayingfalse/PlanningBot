@@ -95,7 +95,12 @@ const DISCORD_CLIENT_ID = (process.env.DISCORD_CLIENT_ID || '').trim();
 //   + Mention Everyone (131072) + Use Slash Commands (2147483648, bit 31) —
 //   i.e. post and update the tracker message, ping responders, and run /meet.
 const BOT_INVITE_URL = DISCORD_CLIENT_ID
-  ? `https://discord.com/api/oauth2/authorize?client_id=${encodeURIComponent(DISCORD_CLIENT_ID)}&permissions=2147633152&integration_type=0&scope=bot%20applications.commands`
+  ? `https://discord.com/oauth2/authorize?${new URLSearchParams({
+    client_id: DISCORD_CLIENT_ID,
+    permissions: '2147633152',
+    integration_type: '0',
+    scope: 'bot applications.commands',
+  }).toString()}`
   : '';
 
 function escapeHtml(str) {
