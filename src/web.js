@@ -84,12 +84,18 @@ const PAGE_STYLE = `
 `;
 
 const DISCORD_CLIENT_ID = (process.env.DISCORD_CLIENT_ID || '').trim();
-// integration_type=1 (Guild Install) is what makes this a pure "add bot" link.
-// Without it, Discord treats the authorize URL as an OAuth2 code grant and the
-// install fails with "Integration requires code grant" unless the app has a
-// redirect URL configured (this app's OAuth redirect is a separate login flow).
+// integration_type=0 (GUILD_INSTALL) is what makes this a pure "add bot to a
+// server" link. (integration_type=1 is USER_INSTALL — Discord rejects the bot
+// scope there with "Invalid scopes provided for user installation".) Without
+// integration_type at all, Discord treats the authorize URL as an OAuth2 code
+// grant and the install fails with "Integration requires code grant" unless the
+// app has a redirect URL configured (this app's OAuth redirect is a separate
+// login flow).
+// permissions=2147633152 = Send Messages (2048) + Embed Links (16384)
+//   + Mention Everyone (131072) + Use Slash Commands (2147483648, bit 31) —
+//   i.e. post and update the tracker message, ping responders, and run /meet.
 const BOT_INVITE_URL = DISCORD_CLIENT_ID
-  ? `https://discord.com/api/oauth2/authorize?client_id=${encodeURIComponent(DISCORD_CLIENT_ID)}&permissions=149504&integration_type=1&scope=bot%20applications.commands`
+  ? `https://discord.com/api/oauth2/authorize?client_id=${encodeURIComponent(DISCORD_CLIENT_ID)}&permissions=2147633152&integration_type=0&scope=bot%20applications.commands`
   : '';
 
 function escapeHtml(str) {
