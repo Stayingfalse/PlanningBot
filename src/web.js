@@ -83,25 +83,11 @@ const PAGE_STYLE = `
   #toast.show { opacity: 0.92; }
 `;
 
-const DISCORD_CLIENT_ID = (process.env.DISCORD_CLIENT_ID || '').trim();
-// integration_type=0 (GUILD_INSTALL) is what makes this a pure "add bot to a
-// server" link. (integration_type=1 is USER_INSTALL — Discord rejects the bot
-// scope there with "Invalid scopes provided for user installation".) Without
-// integration_type at all, Discord treats the authorize URL as an OAuth2 code
-// grant and the install fails with "Integration requires code grant" unless the
-// app has a redirect URL configured (this app's OAuth redirect is a separate
-// login flow).
-// permissions=2147633152 = Send Messages (2048) + Embed Links (16384)
-//   + Mention Everyone (131072) + Use Slash Commands (2147483648, bit 31) —
-//   i.e. post and update the tracker message, ping responders, and run /meet.
-const BOT_INVITE_URL = DISCORD_CLIENT_ID
-  ? `https://discord.com/oauth2/authorize?${new URLSearchParams({
-    client_id: DISCORD_CLIENT_ID,
-    permissions: '2147633152',
-    integration_type: '0',
-    scope: 'bot applications.commands',
-  }).toString()}`
-  : '';
+const DISCORD_INSTALL_AVAILABLE = Boolean(
+  (process.env.DISCORD_CLIENT_ID || '').trim()
+  && (process.env.DISCORD_CLIENT_SECRET || '').trim()
+  && (process.env.BASE_URL || '').trim()
+);
 
 function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -120,9 +106,9 @@ function userBar(viewer) {
   </div>`;
 }
 
-function botInviteButton() {
-  if (!BOT_INVITE_URL) return '';
-  return `<div class="top-actions"><a class="btn discord" href="${escapeHtml(BOT_INVITE_URL)}" target="_blank" rel="noopener noreferrer">Add Bot to Server</a></div>`;
+function botInviteButton(nextPath) {
+  if (!DISCORD_INSTALL_AVAILABLE) return '';
+  return `<div class="top-actions"><a class="btn discord" href="/auth/discord/install?next=${encodeURIComponent(nextPath || '/')}">Add Bot to Server</a></div>`;
 }
 
 // Open Graph / Twitter Card tags, so links shared in Discord, iMessage, etc.
@@ -198,7 +184,7 @@ ${ogMetaTags(og || { title: 'meetup-lite', description: 'Pick some dates and a t
   ${userBar(viewer)}
   <h1>📅 meetup-lite</h1>
   <p class="muted">Pick some dates and a time window, share the link, see when everyone's actually free.</p>
-  ${botInviteButton()}
+  ${botInviteButton('/')}
   ${formOrLogin}
 
 <script>
@@ -306,7 +292,7 @@ ${ogMetaTags(og || { title: 'meetup-lite event', description: 'See when everyone
   <div id="userBarSlot"></div>
   <h1 id="eventTitle">Loading…</h1>
   <p class="muted" id="eventMeta"></p>
-  ${botInviteButton()}
+  ${botInviteButton(`/e/${eventId}`)}
   <div class="responders" id="respondersBar"></div>
 
   <div class="copyrow">

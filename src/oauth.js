@@ -5,6 +5,7 @@ const db = require('./db');
 const CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
 const BASE_URL = (process.env.BASE_URL || '').replace(/\/+$/, '');
+const BOT_PERMISSIONS = '2147633152';
 
 function configured() {
   return Boolean(CLIENT_ID && CLIENT_SECRET && BASE_URL);
@@ -12,6 +13,10 @@ function configured() {
 
 function redirectUri() {
   return `${BASE_URL}/auth/discord/callback`;
+}
+
+function installRedirectUri() {
+  return `${BASE_URL}/auth/discord/install/callback`;
 }
 
 function parseCookies(req) {
@@ -53,12 +58,24 @@ function loginUrl(nextPath) {
   return `https://discord.com/api/oauth2/authorize?${params}`;
 }
 
-// Exchanges an OAuth2 `code` for a Discord identity, upserts the user, and opens a session.
-// Returns { sessionId, nextPath }. Throws on any failure (bad/expired state, bad code, etc).
-async function handleCallback(code, state) {
-  const nextPath = db.consumeOAuthState(state);
-  if (nextPath === null) throw new Error('invalid or expired login attempt — please try logging in again');
+function installUrl(nextPath) {
+  const state = db.createOAuthState(nextPath || '/');
+  // Use Guild Install (integration_type=0) plus a real code-grant callback so
+  // bot invites keep working even when the Discord app requires OAuth2 code
+  // grant for bot authorization.
+  const params = new URLSearchParams({
+    client_id: CLIENT_ID,
+    permissions: BOT_PERMISSIONS,
+    integration_type: '0',
+    scope: 'bot applications.commands',
+    response_type: 'code',
+    redirect_uri: installRedirectUri(),
+    state,
+  });
+  return `https://discord.com/oauth2/authorize?${params}`;
+}
 
+async function exchangeCode(code, uri) {
   const tokenRes = await fetch('https://discord.com/api/oauth2/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -67,11 +84,20 @@ async function handleCallback(code, state) {
       client_secret: CLIENT_SECRET,
       grant_type: 'authorization_code',
       code,
-      redirect_uri: redirectUri(),
+      redirect_uri: uri,
     }),
   });
   if (!tokenRes.ok) throw new Error(`Discord token exchange failed (${tokenRes.status})`);
-  const tokenData = await tokenRes.json();
+  return tokenRes.json();
+}
+
+// Exchanges an OAuth2 `code` for a Discord identity, upserts the user, and opens a session.
+// Returns { sessionId, nextPath }. Throws on any failure (bad/expired state, bad code, etc).
+async function handleCallback(code, state) {
+  const nextPath = db.consumeOAuthState(state);
+  if (nextPath === null) throw new Error('invalid or expired login attempt — please try logging in again');
+
+  const tokenData = await exchangeCode(code, redirectUri());
 
   const userRes = await fetch('https://discord.com/api/users/@me', {
     headers: { Authorization: `Bearer ${tokenData.access_token}` },
@@ -85,4 +111,14 @@ async function handleCallback(code, state) {
   return { sessionId, nextPath };
 }
 
-module.exports = { configured, loginUrl, handleCallback, parseCookies, sessionCookie, clearSessionCookie, getViewer };
+async function handleInstallCallback(code, state) {
+  const nextPath = db.consumeOAuthState(state);
+  if (nextPath === null) throw new Error('invalid or expired bot-install attempt — please try again');
+  await exchangeCode(code, installRedirectUri());
+  return { nextPath };
+}
+
+module.exports = {
+  configured, loginUrl, installUrl, handleCallback, handleInstallCallback,
+  parseCookies, sessionCookie, clearSessionCookie, getViewer,
+};
