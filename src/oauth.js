@@ -15,10 +15,6 @@ function redirectUri() {
   return `${BASE_URL}/auth/discord/callback`;
 }
 
-function installRedirectUri() {
-  return `${BASE_URL}/auth/discord/install/callback`;
-}
-
 function parseCookies(req) {
   const header = req.headers.cookie;
   const out = {};
@@ -47,7 +43,7 @@ function getViewer(req) {
 }
 
 function loginUrl(nextPath) {
-  const state = db.createOAuthState(nextPath || '/');
+  const state = db.createOAuthState(`login:${nextPath || '/'}`);
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
     redirect_uri: redirectUri(),
@@ -59,7 +55,7 @@ function loginUrl(nextPath) {
 }
 
 function installUrl(nextPath) {
-  const state = db.createOAuthState(nextPath || '/');
+  const state = db.createOAuthState(`install:${nextPath || '/'}`);
   // Use Guild Install (integration_type=0) plus a real code-grant callback so
   // bot invites keep working even when the Discord app requires OAuth2 code
   // grant for bot authorization.
@@ -69,7 +65,7 @@ function installUrl(nextPath) {
     integration_type: '0',
     scope: 'bot applications.commands',
     response_type: 'code',
-    redirect_uri: installRedirectUri(),
+    redirect_uri: redirectUri(),
     state,
   });
   return `https://discord.com/oauth2/authorize?${params}`;
@@ -91,13 +87,18 @@ async function exchangeCode(code, uri) {
   return tokenRes.json();
 }
 
-// Exchanges an OAuth2 `code` for a Discord identity, upserts the user, and opens a session.
-// Returns { sessionId, nextPath }. Throws on any failure (bad/expired state, bad code, etc).
+// Exchanges an OAuth2 `code` for either a login or bot-install authorization.
+// Returns { sessionId?, nextPath, installOnly? }. Throws on any failure.
 async function handleCallback(code, state) {
-  const nextPath = db.consumeOAuthState(state);
-  if (nextPath === null) throw new Error('invalid or expired login attempt — please try logging in again');
+  const stateTarget = db.consumeOAuthState(state);
+  if (stateTarget === null) throw new Error('invalid or expired login attempt — please try logging in again');
+  const installOnly = stateTarget.startsWith('install:');
+  const nextPath = stateTarget.startsWith('login:') || installOnly
+    ? stateTarget.slice(stateTarget.indexOf(':') + 1) || '/'
+    : stateTarget;
 
   const tokenData = await exchangeCode(code, redirectUri());
+  if (installOnly) return { nextPath, installOnly: true };
 
   const userRes = await fetch('https://discord.com/api/users/@me', {
     headers: { Authorization: `Bearer ${tokenData.access_token}` },
@@ -111,14 +112,7 @@ async function handleCallback(code, state) {
   return { sessionId, nextPath };
 }
 
-async function handleInstallCallback(code, state) {
-  const nextPath = db.consumeOAuthState(state);
-  if (nextPath === null) throw new Error('invalid or expired bot-install attempt — please try again');
-  await exchangeCode(code, installRedirectUri());
-  return { nextPath };
-}
-
 module.exports = {
-  configured, loginUrl, installUrl, handleCallback, handleInstallCallback,
+  configured, loginUrl, installUrl, handleCallback,
   parseCookies, sessionCookie, clearSessionCookie, getViewer,
 };

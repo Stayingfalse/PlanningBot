@@ -157,21 +157,12 @@ const server = http.createServer(async (req, res) => {
       const state = url.searchParams.get('state');
       if (!code || !state) return sendHtml(res, 400, '<h1>Missing code or state</h1>');
       try {
-        const { sessionId, nextPath } = await oauth.handleCallback(code, state);
-        return redirect(res, nextPath || '/', { 'Set-Cookie': oauth.sessionCookie(sessionId) });
+        const { sessionId, nextPath, installOnly } = await oauth.handleCallback(code, state);
+        return installOnly
+          ? redirect(res, nextPath || '/')
+          : redirect(res, nextPath || '/', { 'Set-Cookie': oauth.sessionCookie(sessionId) });
       } catch (e) {
-        return sendHtml(res, 400, `<h1>Login failed</h1><p>${e.message}</p><p><a href="/">Try again</a></p>`);
-      }
-    }
-    if (req.method === 'GET' && parts[0] === 'auth' && parts[1] === 'discord' && parts[2] === 'install' && parts[3] === 'callback') {
-      const code = url.searchParams.get('code');
-      const state = url.searchParams.get('state');
-      if (!code || !state) return sendHtml(res, 400, '<h1>Missing code or state</h1>');
-      try {
-        const { nextPath } = await oauth.handleInstallCallback(code, state);
-        return redirect(res, nextPath || '/');
-      } catch (e) {
-        return sendHtml(res, 400, `<h1>Bot install failed</h1><p>${e.message}</p><p><a href="/">Try again</a></p>`);
+        return sendHtml(res, 400, `<h1>Discord authorization failed</h1><p>${e.message}</p><p><a href="/">Try again</a></p>`);
       }
     }
     if (req.method === 'GET' && parts[0] === 'auth' && parts[1] === 'logout') {
