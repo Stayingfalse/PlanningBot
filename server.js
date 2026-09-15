@@ -147,15 +147,22 @@ const server = http.createServer(async (req, res) => {
       const next = url.searchParams.get('next') || '/';
       return redirect(res, oauth.loginUrl(next));
     }
+    if (req.method === 'GET' && parts[0] === 'auth' && parts[1] === 'discord' && parts[2] === 'install' && parts.length === 3) {
+      if (!oauth.configured()) return sendHtml(res, 500, '<h1>Discord bot install is not configured</h1><p>Set DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, and BASE_URL.</p>');
+      const next = url.searchParams.get('next') || '/';
+      return redirect(res, oauth.installUrl(next));
+    }
     if (req.method === 'GET' && parts[0] === 'auth' && parts[1] === 'discord' && parts[2] === 'callback') {
       const code = url.searchParams.get('code');
       const state = url.searchParams.get('state');
       if (!code || !state) return sendHtml(res, 400, '<h1>Missing code or state</h1>');
       try {
-        const { sessionId, nextPath } = await oauth.handleCallback(code, state);
-        return redirect(res, nextPath || '/', { 'Set-Cookie': oauth.sessionCookie(sessionId) });
+        const { sessionId, nextPath, installOnly } = await oauth.handleCallback(code, state);
+        return installOnly
+          ? redirect(res, nextPath || '/')
+          : redirect(res, nextPath || '/', { 'Set-Cookie': oauth.sessionCookie(sessionId) });
       } catch (e) {
-        return sendHtml(res, 400, `<h1>Login failed</h1><p>${e.message}</p><p><a href="/">Try again</a></p>`);
+        return sendHtml(res, 400, `<h1>Discord authorization failed</h1><p>${e.message}</p><p><a href="/">Try again</a></p>`);
       }
     }
     if (req.method === 'GET' && parts[0] === 'auth' && parts[1] === 'logout') {
